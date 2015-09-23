@@ -198,13 +198,23 @@ module Grape
         values = validations[:values]
         doc_attrs[:values] = values if values
 
+        between = validations[:between]
+        between = [between.first, between.last] if between.is_a?(Range)
+        doc_attrs[:between] = between if between
+
         coerce_type = guess_coerce_type(coerce_type, values)
 
         # default value should be present in values array, if both exist and are not procs
         check_incompatible_option_values(values, default)
 
+        # default value should be between specified endpoints, if both exist and are not procs
+        check_incompatible_option_between(between, default)
+
         # type should be compatible with values array, if both exist
         validate_value_coercion(coerce_type, values)
+
+        # type should be compatible with between endpoints, if both exist
+        validate_between_endpoints_coercion(coerce_type, between)
 
         doc_attrs[:documentation] = validations.delete(:documentation) if validations.key?(:documentation)
 
@@ -248,6 +258,13 @@ module Grape
         fail Grape::Exceptions::IncompatibleOptionValues.new(:default, default, :values, values)
       end
 
+      def check_incompatible_option_between(endpoints, default)
+        return unless endpoints && default
+        return if endpoints.is_a?(Proc) || endpoints.any? { |e| e.is_a?(Proc) } || default.is_a?(Proc)
+        return if default.between?(endpoints.first,endpoints.last)
+        fail Grape::Exceptions::IncompatibleOptionValues.new(:default, default, :between, endpoints)
+      end
+
       def validate(type, options, attrs, doc_attrs)
         validator_class = Validations.validators[type.to_s]
 
@@ -269,6 +286,17 @@ module Grape
         end
         return unless value_types.any? { |v| !v.is_a?(coerce_type) }
         fail Grape::Exceptions::IncompatibleOptionValues.new(:type, coerce_type, :values, values)
+      end
+
+      def validate_between_endpoints_coercion(coerce_type, endpoints)
+        return unless coerce_type && endpoints
+        return if endpoints.is_a?(Proc) || endpoints.any? { |e| e.is_a?(Proc) }
+        coerce_type = coerce_type.first if coerce_type.is_a?(Array)
+        if coerce_type == Virtus::Attribute::Boolean
+          endpoints = endpoints.map { |element| Virtus::Attribute.build(element) }
+        end
+        return unless endpoints.any? { |v| !v.is_a?(coerce_type) }
+        fail Grape::Exceptions::IncompatibleOptionValues.new(:type, coerce_type, :between, endpoints)
       end
     end
   end

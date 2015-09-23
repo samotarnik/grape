@@ -147,9 +147,21 @@ describe Grape::Validations::ParamsScope do
       end.to raise_error Grape::Exceptions::IncompatibleOptionValues
     end
 
+    it 'raises exception when endpoints are of different type' do
+      expect do
+        subject.params { requires :numbers, type: Integer, between: [1, 'definitely not a number'] }
+      end.to raise_error Grape::Exceptions::IncompatibleOptionValues
+    end
+
     it 'raises exception when range values have different endpoint types' do
       expect do
         subject.params { requires :numbers, type: Array, values: 0.0..10 }
+      end.to raise_error Grape::Exceptions::IncompatibleOptionValues
+    end
+
+    it 'raises exception when range values have different endpoint types' do
+      expect do
+        subject.params { requires :numbers, type: Integer, between: 0.0..10 }
       end.to raise_error Grape::Exceptions::IncompatibleOptionValues
     end
   end
